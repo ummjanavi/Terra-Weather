@@ -205,19 +205,3 @@ snow.png
 ```
 
 If textures are not present, the renderer automatically falls back to solid terrain colors.
-
-## What I Learned
-
-This project gave me experience with:
-
-* C++ graphics programming
-* Procedural terrain generation
-* Perlin and fractal noise
-* GLSL shader programming
-* Ray tracing
-* GPU and CPU rendering approaches
-* Multithreading and performance optimization
-* Lighting and atmospheric rendering
-* Volumetric effects
-* Large-scale project architecture with CMake
-* Integrating multiple simulation systems into a shared world model
