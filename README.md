@@ -1,84 +1,223 @@
-# ProceduralWorld — Ray Tracer Edition
+# Terra-Weather
 
-A CPU ray tracer + procedural terrain + climate/weather simulation, all flowing
-through a single shared `WorldData` struct.
-## Build
+A procedural 3D terrain, climate, and weather simulation built in C++ using computer graphics and ray tracing techniques.
 
-Requires CMake ≥ 3.20 and a C++17 compiler. GLFW, GLM, and GLAD are pulled
-automatically via `FetchContent`, so the only system-level dependency is OpenGL
-3.3 drivers.
+Terra-Weather procedurally generates a terrain environment and combines it with atmospheric, climate, cloud, and weather systems. The project explores procedural generation, real-time graphics, ray tracing, shader programming, and performance optimization.
 
-```bash
-cd Terra-Weather
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-./build/ProceduralWorld
+## Features
+
+* Procedurally generated terrain using layered noise
+* Dynamic climate and weather simulation
+* Volumetric cloud rendering
+* Day/night lighting controls
+* Interactive 3D camera movement
+* CPU-based ray tracing
+* GPU rendering support
+* Progressive rendering that improves image quality while the camera remains still
+* Multithreaded tile-based rendering
+* Terrain materials for grass, rock, and snow
+* Screenshot capture
+* Random terrain regeneration using different seeds
+
+## Tech Stack
+
+**Language**
+
+* C++17
+
+**Graphics**
+
+* OpenGL 3.3+
+* GLFW
+* GLAD
+* GLM
+* GLSL shaders
+
+**Build System**
+
+* CMake 3.20+
+
+**Rendering**
+
+* CPU ray tracer
+* GPU rendering infrastructure
+* Progressive sampling
+* Multithreaded tile rendering
+* Bounding Volume Hierarchy (BVH) acceleration
+* Shadow rays and direct sunlight sampling
+
+## Procedural Terrain Generation
+
+Terrain is generated using procedural noise rather than predefined heightmaps.
+
+The terrain system uses:
+
+* 2D Perlin noise
+* Fractal noise generated from multiple Perlin-noise octaves
+* Adjustable persistence
+* Adjustable lacunarity
+* Seed-based procedural generation
+
+Multiple octaves of noise are combined at different frequencies and amplitudes to produce more natural terrain features.
+
+The default terrain generation configuration uses six octaves with configurable scale, persistence, and lacunarity.
+
+The project also uses **3D Perlin noise** to perturb volumetric cloud density and create more organic cloud formations.
+
+## Shaders
+
+The project contains GLSL shaders for GPU rendering:
+
+```text
+shaders/
+├── display.vert
+├── display.frag
+└── raytrace.comp
 ```
 
-On Linux you may additionally need the usual X11/Wayland dev packages that
-GLFW expects (`xorg-dev`, `libwayland-dev`, etc.).
+* `display.vert` — vertex shader used for displaying the rendered image
+* `display.frag` — fragment shader used during image presentation
+* `raytrace.comp` — compute shader used by the GPU ray-tracing pipeline
+
+## Architecture
+
+The project is separated into several major systems:
+
+```text
+Terra-Weather/
+├── include/
+│   ├── Camera.h
+│   ├── Climate.h
+│   ├── CloudMap.h
+│   ├── HeightMap.h
+│   ├── NoiseGen.h
+│   ├── Atmosphere.h
+│   ├── BVH.h
+│   ├── Materials.h
+│   ├── CPURenderer.h
+│   ├── GPURenderer.h
+│   └── WorldData.h
+│
+├── src/
+│   ├── core/
+│   ├── terrain/
+│   ├── raytracer/
+│   ├── climate/
+│   └── main.cpp
+│
+├── shaders/
+│   ├── display.vert
+│   ├── display.frag
+│   └── raytrace.comp
+│
+└── CMakeLists.txt
+```
+
+### Core
+
+Handles the application window, camera controls, framebuffer, and other low-level rendering infrastructure.
+
+### Terrain
+
+Generates height data using procedural Perlin and fractal noise.
+
+### Ray Tracer
+
+Handles scene intersection, materials, terrain geometry, lighting, atmospheric effects, clouds, and ray-tracing calculations.
+
+### Climate
+
+Generates environmental data including humidity, wind, precipitation, weather, and cloud information.
+
+### Shared World Data
+
+The simulation systems communicate through shared world data so that terrain, climate, clouds, and rendering all use the same generated environment.
+
+## Rendering Strategy
+
+To maintain responsiveness while rendering computationally expensive scenes, the renderer uses progressive rendering.
+
+When the camera moves or a new terrain seed is generated:
+
+1. The framebuffer resets.
+2. Rendering begins at reduced resolution with one sample per pixel.
+3. A multithreaded tile-based renderer distributes work across available CPU threads.
+4. After several preview samples, rendering switches to full resolution.
+5. Additional samples continue accumulating until the camera moves again.
+
+Ray paths use Russian roulette termination after several bounces to reduce unnecessary computation.
 
 ## Controls
 
-| Key           | Action                                        |
-|---------------|-----------------------------------------------|
-| `W A S D`     | move horizontally (hold `Shift` to sprint)    |
-| `Q / E`       | descend / ascend                              |
-| RMB + drag    | look around                                   |
-| `R`           | regenerate with a new random seed             |
-| `[` / `]`     | earlier / later time of day                   |
-| `F12`         | save `screenshot.png` of current image        |
-| `Esc`         | quit                                          |
+| Input              | Action                                      |
+| ------------------ | ------------------------------------------- |
+| `W A S D`          | Move horizontally                           |
+| `Shift`            | Sprint                                      |
+| `Q / E`            | Move down / up                              |
+| Right Mouse + Drag | Look around                                 |
+| `R`                | Generate a new world seed                   |
+| `[` / `]`          | Move backward / forward through time of day |
+| `F12`              | Save a screenshot                           |
+| `Esc`              | Exit                                        |
 
-## Textures
+## Building the Project
 
-Drop `grass.png`, `rock.png`, `snow.png` into `assets/textures/`. If missing,
-the terrain material falls back to plausible solid colours so the build still
-runs. An `assets/hdri/sky.hdr` slot is reserved for a future environment-map
-fallback but is not required.
+### Requirements
 
-## Rendering strategy
+* C++17-compatible compiler
+* CMake 3.20+
+* OpenGL 3.3+ compatible graphics drivers
 
-1. When the camera moves (or seed changes) the framebuffer is cleared and
-   dropped to 1/4 resolution, 1 SPP. A tile-based thread pool (32×32 tiles,
-   `hardware_concurrency()` threads) fills a pass.
-2. After 4 accumulated samples of preview the framebuffer is promoted to full
-   window resolution and keeps refining until the camera moves again.
-3. Path termination uses Russian roulette past depth 3.
-4. Direct sun sampling is a per-hit shadow ray, attenuated by a single cloud
-   transmittance probe — cheap but visibly correct through-cloud dimming.
+GLFW, GLM, and GLAD are downloaded automatically through CMake.
 
-Expect **1–4 FPS at 1/4 resolution with 1 SPP, `maxDepth = 4`** on an 8-core
-machine, as the plan anticipated. A full 1080p 64-SPP render is multi-minute;
-use `F12` after letting it refine for 20–30 seconds.
+### Build
 
+```bash
+git clone https://github.com/ummjanavi/Terra-Weather.git
+cd Terra-Weather
 
-## File tree
-
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
 ```
-Terra-Weather/
-├── CMakeLists.txt
-├── README.md
-├── assets/
-│   ├── hdri/           (sky.hdr — optional, not included)
-│   └── textures/       (grass.png, rock.png, snow.png — optional)
-├── external/
-│   ├── stb_image.h
-│   └── stb_image_write.h
-├── include/
-│   ├── AABB.h            Camera.h            Hittable.h          Ray.h
-│   ├── Atmosphere.h      Climate.h           Material.h          RayTrace.h
-│   ├── BVH.h             CloudMap.h          Materials.h         Renderer.h
-│   │                     Framebuffer.h       NoiseGen.h          Scene.h
-│   ├── HeightMap.h       HitRecord.h                             TerrainHittable.h
-│   ├── Texture2D.h       VolumetricCloud.h   WeatherVolume.h     Window.h
-│   └── WorldData.h
-└── src/
-    ├── main.cpp
-    ├── core/             (Window, Framebuffer, Camera, Texture2D)
-    ├── terrain/          (NoiseGen, HeightMap)
-    ├── raytracer/        (Renderer, Scene, BVH, TerrainHittable, RayTrace,
-    │                      Materials, Atmosphere, VolumetricCloud, WeatherVolume)
-    └── climate/          (HumidityMap, WindField, WeatherMap,
-                           Precipitation, CloudMap)
+
+Run the program:
+
+```bash
+./build/ProceduralWorld
 ```
+
+Linux users may also need the development packages required by GLFW for X11 or Wayland.
+
+## Optional Textures
+
+Terrain textures can be placed in:
+
+```text
+assets/textures/
+```
+
+Supported texture names include:
+
+```text
+grass.png
+rock.png
+snow.png
+```
+
+If textures are not present, the renderer automatically falls back to solid terrain colors.
+
+## What I Learned
+
+This project gave me experience with:
+
+* C++ graphics programming
+* Procedural terrain generation
+* Perlin and fractal noise
+* GLSL shader programming
+* Ray tracing
+* GPU and CPU rendering approaches
+* Multithreading and performance optimization
+* Lighting and atmospheric rendering
+* Volumetric effects
+* Large-scale project architecture with CMake
+* Integrating multiple simulation systems into a shared world model
